@@ -1,5 +1,7 @@
 tqdm
+torch
+pydicom
 pandas
 pillow
-skimage
+scikit-image
 SimpleITK

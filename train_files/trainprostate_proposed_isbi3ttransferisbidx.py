@@ -1,5 +1,7 @@
 import sys
 
+import datasetprostate_proposed
+
 sys.path.extend(['../'])
 import os, time, argparse, random
 import numpy as np
@@ -368,9 +370,9 @@ def Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labelcas
         startimgslices = torch.zeros(len(test_cases))
         for casecount in tqdm(range(len(test_cases)), total=len(test_cases)):
             caseidx = test_cases[casecount]
-            caseimg = [file for file in test_dataset.imgs if caseidx.split('/')[-1].split('.')[0] in file]
+            caseimg = [file for file in test_dataset.imgs if int(file.split('/')[0]) == caseidx]
             caseimg.sort()
-            casemask = [file for file in test_dataset.masks if caseidx.split('/')[-1].split('.')[0] in file]
+            casemask = [file for file in test_dataset.masks if int(file.split('/')[0]) == caseidx]
             casemask.sort()
             generatedtarget1 = []
             generatedtarget2 = []
@@ -419,9 +421,9 @@ def Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labelcas
         generatedmask2 = []
         for casecount in tqdm(range(len(train_cases)), total=len(train_cases)):
             caseidx = train_cases[casecount]
-            caseimg = [file for file in train_dataset.imgs if caseidx.split('/')[-1].split('.')[0] in file]
+            caseimg = [file for file in train_dataset.imgs if int(file.split('/')[0]) == caseidx]
             caseimg.sort()
-            casemask = [file for file in train_dataset.masks if caseidx.split('/')[-1].split('.')[0] in file]
+            casemask = [file for file in train_dataset.masks if int(file.split('/')[0]) == caseidx]
             casemask.sort()
             generatedtarget1 = []
             generatedtarget2 = []
@@ -561,12 +563,12 @@ logging.basicConfig(level=logging.INFO,
 
 if __name__ == "__main__":
     args = parse_args()
-    train_root = '../../inputs_prostatemr'
-    train_csv = '../../inputs_prostatemr/Prostate_split2D_crossdomain/ISBI2013_nrrd_combineall/train3tgeneratedx_train.csv'
-    test_csv = '../../inputs_prostatemr/Prostate_split2D_crossdomain/ISBI2013_nrrd_combineall/train3tgeneratedx_testall.csv'
-    traincase_csv = '../../inputs_prostatemr/Prostate_split2D_crossdomain/ISBI2013_nrrd_combineall/train3tgeneratedx_casetrain.csv'
-    testcase_csv = '../../inputs_prostatemr/Prostate_split2D_crossdomain/ISBI2013_nrrd_combineall/train3tgeneratedx_casetestall.csv'
-    labeledcase_csv = '../../inputs_prostatemr/Prostate_split2D_crossdomain/ISBI2013_nrrd_combineall/train3tgeneratedx_labeledcasetrain.csv'
+    train_root = '../input_forrest7T/images_and_masks'
+    train_csv = '../input_forrest7T/csvFiles/train_data2.csv'
+    test_csv = '../input_forrest7T/csvFiles/test_data1.csv'
+    traincase_csv = '../input_forrest7T/csvFiles/train_cases2.csv'
+    testcase_csv = '../input_forrest7T/csvFiles/test_case1.csv'
+    labeledcase_csv = '../input_forrest7T/csvFiles/labelled_case1.csv'
     tempmaskfolder = 'generated_masks_train3tgeneratedx'
     makefolder(os.path.join(train_root, tempmaskfolder))
     tempmaskfolder = 'generated_masks_train3tgeneratedx/{}_{}'.format(args.model_name, args.repetition)

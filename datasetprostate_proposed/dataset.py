@@ -14,7 +14,7 @@ class prostate_seg(Dataset):
         img_mask = pd.read_csv(csv_file)
         self.imgs = img_mask['Image'].values.tolist()
         self.masks = img_mask['Mask'].values.tolist()
-        self.depths = img_mask['Depth'].values.tolist()
+        #self.depths = img_mask['Depth'].values.tolist()
         self.tempmaskfolder = tempmaskfolder
         self.transform = transform
         self.train = train
@@ -22,7 +22,7 @@ class prostate_seg(Dataset):
     def __getitem__(self, idx):
 
         imgarr = sitk.GetArrayFromImage(sitk.ReadImage(os.path.join(self.root, self.imgs[idx])))
-        imgarr = imgarr[self.depths[idx], :, :]
+        #imgarr = imgarr[self.depths[idx], :, :]
         imgarr = imgarr / imgarr.max() * 255.0
         img = Image.fromarray(imgarr)
         if img.mode != 'RGB':
@@ -41,13 +41,13 @@ class prostate_seg(Dataset):
             maskpath2 = maskpath
 
         maskarr = sitk.GetArrayFromImage(sitk.ReadImage(maskpath))
-        maskarr = maskarr[self.depths[idx], :, :]
+        #maskarr = maskarr[self.depths[idx], :, :]
         maskarr[maskarr > 0] = 1
         mask = Image.fromarray(maskarr.astype(np.int8))
 
         if os.path.exists(maskpath1):
             maskarr1 = sitk.GetArrayFromImage(sitk.ReadImage(maskpath1))
-            maskarr1 = maskarr1[self.depths[idx], :, :]
+            #maskarr1 = maskarr1[self.depths[idx], :, :]
             maskarr1[maskarr1 > 0] = 1
             mask1 = Image.fromarray(maskarr1.astype(np.int8))
         else:
@@ -55,7 +55,7 @@ class prostate_seg(Dataset):
 
         if os.path.exists(maskpath2):
             maskarr2 = sitk.GetArrayFromImage(sitk.ReadImage(maskpath2))
-            maskarr2 = maskarr2[self.depths[idx], :, :]
+            #maskarr2 = maskarr2[self.depths[idx], :, :]
             maskarr2[maskarr2 > 0] = 1
             mask2 = Image.fromarray(maskarr2.astype(np.int8))
         else:
