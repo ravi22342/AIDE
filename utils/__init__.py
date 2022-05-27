@@ -1,5 +1,5 @@
 from .loss2d import CrossEntropyLoss2d, DiceLoss, CEDiceLoss, CEMDiceLoss, MulticlassDiceLoss, \
-    Dice_Loss, MulticlassMSELoss, CEMDiceLossImage
+    Dice_Loss, MulticlassMSELoss, CEMDiceLossImage, segmentationLossImage, consistencyLossImage
 
 from .metrics2d import Dice_fn, IoU_fn, TP_TN_FP_FN,  MulticlassDice_fn, MulticlassIoU_fn, MulticlassTP_TN_FP_FN,\
     MulticlassAccuracy_fn, Dice_fn_Nozero

@@ -14,11 +14,12 @@ from tqdm import tqdm
 from torch.optim.lr_scheduler import StepLR
 from PIL import Image
 import pandas as pd
-import pydicom
 from skimage import measure
 import torch.nn.functional as F
 import shutil
 import SimpleITK as sitk
+
+import datasetprostate_proposed
 from datasetprostate_proposed import prostate_seg, Compose, Resize, RandomRotate, RandomHorizontallyFlip, ToTensor, \
     Normalize
 from models_singlemodalinput import UNet, UNetsa
@@ -41,7 +42,7 @@ def parse_args():
     parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
     parser.add_argument('--warmup_epoch', default=1, type=int, help='pretrain num epoch')
     parser.add_argument('--num_epoch', default=1, type=int, help='num epoch')
-    parser.add_argument('--loss', default='cedice', type=str, help='ce, dice')
+    parser.add_argument('--loss', default='segmentation', type=str, help='ce, dice')
     parser.add_argument('--img_size', default=256, type=int, help='512')
     parser.add_argument('--temperature', default=1.0, type=float, help='0.5')
     parser.add_argument('--lr_policy', default='StepLR', type=str, help='StepLR')
@@ -408,162 +409,167 @@ def Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labelcas
                 targets2 = targets2.to(device)
                 outputs1 = net1(inputs)
                 outputs2 = net2(inputs)
-                loss1 = segmentationLossImage(outputs1, targets2).mean()
-                loss2 = segmentationLossImage(outputs2, targets1).mean()
+                loss1 = seg_loss(outputs1, targets2).mean()
+                loss2 = seg_loss(outputs2, targets1).mean()
             test_count += inputs.shape[0]
             test_loss1 += loss1.item() * inputs.shape[0]
             test_dice1 += get_dice_score(outputs1, targets2).item()
             test_loss2 += loss2.item() * inputs.shape[0]
             test_dice2 += get_dice_score(outputs2, targets1).item()
-        #
+
         test_loss1_epoch = test_loss1 / float(test_count)
         test_dice1_epoch = test_dice1 / float(test_count)
         test_loss2_epoch = test_loss2 / float(test_count)
         test_dice2_epoch = test_dice2 / float(test_count)
 
-        # testcasedices1 = torch.zeros(len(test_cases))
-        # testcasedices2 = torch.zeros(len(test_cases))
-        # startimgslices = torch.zeros(len(test_cases))
-        # for casecount in tqdm(range(len(test_cases)), total=len(test_cases)):
-        #     caseidx = test_cases[casecount]
-        #     caseimg = [file for file in test_dataset.imgs if int(file.split('/')[0]) == caseidx]
-        #     caseimg.sort()
-        #     casemask = [file for file in test_dataset.masks if int(file.split('/')[0]) == caseidx]
-        #     casemask.sort()
-        #     print(caseimg)
-        #     print(casemask)
-        #     generatedtarget1 = []
-        #     generatedtarget2 = []
-        #     target1 = []
-        #     target2 = []
-        #     startcaseimg = int(torch.sum(startimgslices[:casecount + 1]))
-        #     for imgidx in range(len(caseimg)):
-        #         assert caseimg[imgidx].split('/')[-1].split('.')[0] == \
-        #                casemask[imgidx].split('/')[-1].split('.')[0].split('_')[0]
-        #         sample = test_dataset.__getitem__(imgidx + startcaseimg)
-        #         input = sample[0]
-        #         mask1 = sample[3]
-        #         mask2 = sample[4]
-        #         target1.append(mask1)
-        #         target2.append(mask2)
-        #         with torch.no_grad():
-        #             input = torch.unsqueeze(input.to(device), 0)
-        #             output1 = net1(input)
-        #             output1 = F.sigmoid(output1)
-        #             output1 = torch.argmax(output1, dim=1)
-        #             output1 = output1.squeeze().cpu().numpy()
-        #             generatedtarget1.append(output1)
-        #             output2 = net2(input)
-        #             output2 = F.sigmoid(output2)
-        #             output2 = torch.argmax(output2, dim=1)
-        #             output2 = output2.squeeze().cpu().numpy()
-        #             generatedtarget2.append(output2)
-        #     target1 = np.stack(target1, axis=-1)
-        #     target2 = np.stack(target2, axis=-1)
-        #     generatedtarget1 = np.stack(generatedtarget1, axis=-1)
-        #     generatedtarget2 = np.stack(generatedtarget2, axis=-1)
-        #     generatedtarget1_keeplargest = keep_largest_connected_components(generatedtarget1)
-        #     generatedtarget2_keeplargest = keep_largest_connected_components(generatedtarget2)
-        #     testcasedices1[casecount] = Dice3d_fn(generatedtarget1_keeplargest, target1)
-        #     testcasedices2[casecount] = Dice3d_fn(generatedtarget2_keeplargest, target2)
-        #     if casecount + 1 < len(test_cases):
-        #         startimgslices[casecount + 1] = len(caseimg)
-        # testcasedice1 = testcasedices1.sum() / float(len(test_cases))
-        # testcasedice2 = testcasedices2.sum() / float(len(test_cases))
-        #
-        # traincasedices1 = torch.zeros(len(train_cases))
-        # traincasedices2 = torch.zeros(len(train_cases))
-        # # update pseudolabel
-        # startimgslices = torch.zeros(len(train_cases))
-        # generatedmask1 = []
-        # generatedmask2 = []
-        # for casecount in tqdm(range(len(train_cases)), total=len(train_cases)):
-        #     caseidx = train_cases[casecount]
-        #     caseimg = [file for file in train_dataset.imgs if int(file.split('/')[0]) == caseidx]
-        #     caseimg.sort()
-        #     casemask = [file for file in train_dataset.masks if int(file.split('/')[0]) == caseidx]
-        #     casemask.sort()
-        #     generatedtarget1 = []
-        #     generatedtarget2 = []
-        #     target1 = []
-        #     target2 = []
-        #     startcaseimg = int(torch.sum(startimgslices[:casecount + 1]))
-        #     for imgidx in range(len(caseimg)):
-        #         assert caseimg[imgidx].split('/')[-1].split('.')[0] == \
-        #                casemask[imgidx].split('/')[-1].split('.')[0].split('_')[0]
-        #         sample = train_dataset.__getitem__(imgidx + startcaseimg)
-        #         input = sample[0]
-        #         mask1 = sample[3]
-        #         mask2 = sample[4]
-        #         target1.append(mask1)
-        #         target2.append(mask2)
-        #         with torch.no_grad():
-        #             input = torch.unsqueeze(input.to(device), 0)
-        #             output1 = net1(input)
-        #             output1 = F.softmax(output1, dim=1)
-        #             output1 = torch.argmax(output1, dim=1)
-        #             output1 = output1.squeeze().cpu().numpy()
-        #             generatedtarget1.append(output1)
-        #
-        #             output2 = net2(input)
-        #             output2 = F.softmax(output2, dim=1)
-        #             output2 = torch.argmax(output2, dim=1)
-        #             output2 = output2.squeeze().cpu().numpy()
-        #             generatedtarget2.append(output2)
-        #
-        #     target1 = np.stack(target1, axis=-1)
-        #     target2 = np.stack(target2, axis=-1)
-        #     generatedtarget1 = np.stack(generatedtarget1, axis=-1)
-        #     generatedtarget2 = np.stack(generatedtarget2, axis=-1)
-        #     generatedtarget1_keeplargest = keep_largest_connected_components(generatedtarget1)
-        #     generatedtarget2_keeplargest = keep_largest_connected_components(generatedtarget2)
-        #     traincasedices1[casecount] = Dice3d_fn(generatedtarget1_keeplargest, target1)
-        #     traincasedices2[casecount] = Dice3d_fn(generatedtarget2_keeplargest, target2)
-        #     generatedmask1.append(generatedtarget1_keeplargest)
-        #     generatedmask2.append(generatedtarget2_keeplargest)
-        #     if casecount + 1 < len(train_cases):
-        #         startimgslices[casecount + 1] = len(caseimg)
-        #
-        # traincasedice1 = traincasedices1.sum() / float(len(train_cases))
-        # traincasedice2 = traincasedices2.sum() / float(len(train_cases))
-        #
-        # traincasediceavgtemp = (traincasedice1 + traincasedice2) / 2.0
-        #
-        # if traincasediceavgtemp > besttraincasedice:
-        #     backfolder = os.path.join(train_root, tempmaskfolder + '_besttraindice')
-        #     if os.path.exists(backfolder):
-        #         shutil.rmtree(backfolder)
-        #     shutil.copytree(os.path.join(train_root, tempmaskfolder), backfolder)
-        #
-        #     besttraincasedice = traincasediceavgtemp
-        #     logging.info('Best Checkpoint {} Saving...'.format(epoch + 1))
-        #
-        #     save_model = net1
-        #     if torch.cuda.device_count() > 1:
-        #         save_model = list(net1.children())[0]
-        #     state = {
-        #         'net': save_model.state_dict(),
-        #         'loss': test_loss1_epoch,
-        #         'epoch': epoch + 1,
-        #     }
-        #     savecheckname = os.path.join('D:\Deep_Learning\AIDE\data_files', params1_name.split('.pkl')[0] +
-        #                                  '_besttraincasedice.' + params1_name.split('.')[-1])
-        #     print(savecheckname)
-        #     torch.save(state, savecheckname)
-        #
-        #     save_model = net2
-        #     if torch.cuda.device_count() > 1:
-        #         save_model = list(net2.children())[0]
-        #     state = {
-        #         'net': save_model.state_dict(),
-        #         'loss': test_loss2_epoch,
-        #         'epoch': epoch + 1,
-        #     }
-        #     savecheckname = os.path.join('D:\Deep_Learning\AIDE\data_files', params2_name.split('.pkl')[0] +
-        #                                  '_besttraincasedice.' + params2_name.split('.')[-1])
-        #     print(savecheckname)
-        #     torch.save(state, savecheckname)
-        #
+        print("test_loss1_epoch---", test_loss1_epoch)
+        print("test_dice1_epoch---", test_dice1_epoch)
+        print("test_loss2_epoch---", test_loss2_epoch)
+        print("test_dice2_epoch---", test_dice2_epoch)
+
+        testcasedices1 = torch.zeros(len(test_cases))
+        testcasedices2 = torch.zeros(len(test_cases))
+        startimgslices = torch.zeros(len(test_cases))
+        for casecount in tqdm(range(len(test_cases)), total=len(test_cases)):
+            caseidx = test_cases[casecount]
+            caseimg = [file for file in test_dataset.imgs if int(file.split('/')[0]) == caseidx]
+            caseimg.sort()
+            casemask = [file for file in test_dataset.masks if int(file.split('/')[0]) == caseidx]
+            casemask.sort()
+            print(caseimg)
+            print(casemask)
+            generatedtarget1 = []
+            generatedtarget2 = []
+            target1 = []
+            target2 = []
+            startcaseimg = int(torch.sum(startimgslices[:casecount + 1]))
+            for imgidx in range(len(caseimg)):
+                assert caseimg[imgidx].split('/')[-1].split('.')[0] == \
+                       casemask[imgidx].split('/')[-1].split('.')[0].split('_')[0]
+                sample = test_dataset.__getitem__(imgidx + startcaseimg)
+                input = sample[0]
+                mask1 = sample[3]
+                mask2 = sample[4]
+                target1.append(mask1)
+                target2.append(mask2)
+                with torch.no_grad():
+                    input = torch.unsqueeze(input.to(device), 0)
+                    output1 = net1(input)
+                    output1 = F.sigmoid(output1)
+                    output1 = torch.argmax(output1, dim=1)
+                    output1 = output1.squeeze().cpu().numpy()
+                    generatedtarget1.append(output1)
+                    output2 = net2(input)
+                    output2 = F.sigmoid(output2)
+                    output2 = torch.argmax(output2, dim=1)
+                    output2 = output2.squeeze().cpu().numpy()
+                    generatedtarget2.append(output2)
+            target1 = np.stack(target1, axis=-1)
+            target2 = np.stack(target2, axis=-1)
+            generatedtarget1 = np.stack(generatedtarget1, axis=-1)
+            generatedtarget2 = np.stack(generatedtarget2, axis=-1)
+            generatedtarget1_keeplargest = keep_largest_connected_components(generatedtarget1)
+            generatedtarget2_keeplargest = keep_largest_connected_components(generatedtarget2)
+            testcasedices1[casecount] = Dice3d_fn(generatedtarget1_keeplargest, target1)  #namdu
+            testcasedices2[casecount] = Dice3d_fn(generatedtarget2_keeplargest, target2)
+            if casecount + 1 < len(test_cases):
+                startimgslices[casecount + 1] = len(caseimg)
+        testcasedice1 = testcasedices1.sum() / float(len(test_cases))
+        testcasedice2 = testcasedices2.sum() / float(len(test_cases))
+
+        traincasedices1 = torch.zeros(len(train_cases))
+        traincasedices2 = torch.zeros(len(train_cases))
+        # update pseudolabel
+        startimgslices = torch.zeros(len(train_cases))
+        generatedmask1 = []
+        generatedmask2 = []
+        for casecount in tqdm(range(len(train_cases)), total=len(train_cases)):
+            caseidx = train_cases[casecount]
+            caseimg = [file for file in train_dataset.imgs if int(file.split('/')[0]) == caseidx]
+            caseimg.sort()
+            casemask = [file for file in train_dataset.masks if int(file.split('/')[0]) == caseidx]
+            casemask.sort()
+            generatedtarget1 = []
+            generatedtarget2 = []
+            target1 = []
+            target2 = []
+            startcaseimg = int(torch.sum(startimgslices[:casecount + 1]))
+            for imgidx in range(len(caseimg)):
+                assert caseimg[imgidx].split('/')[-1].split('.')[0] == \
+                       casemask[imgidx].split('/')[-1].split('.')[0].split('_')[0]
+                sample = train_dataset.__getitem__(imgidx + startcaseimg)
+                input = sample[0]
+                mask1 = sample[3]
+                mask2 = sample[4]
+                target1.append(mask1)
+                target2.append(mask2)
+                with torch.no_grad():
+                    input = torch.unsqueeze(input.to(device), 0)
+                    output1 = net1(input)
+                    output1 = F.softmax(output1, dim=1)
+                    output1 = torch.argmax(output1, dim=1)
+                    output1 = output1.squeeze().cpu().numpy()
+                    generatedtarget1.append(output1)
+
+                    output2 = net2(input)
+                    output2 = F.softmax(output2, dim=1)
+                    output2 = torch.argmax(output2, dim=1)
+                    output2 = output2.squeeze().cpu().numpy()
+                    generatedtarget2.append(output2)
+
+            target1 = np.stack(target1, axis=-1)
+            target2 = np.stack(target2, axis=-1)
+            generatedtarget1 = np.stack(generatedtarget1, axis=-1)
+            generatedtarget2 = np.stack(generatedtarget2, axis=-1)
+            generatedtarget1_keeplargest = keep_largest_connected_components(generatedtarget1)
+            generatedtarget2_keeplargest = keep_largest_connected_components(generatedtarget2)
+            traincasedices1[casecount] = Dice3d_fn(generatedtarget1_keeplargest, target1)
+            traincasedices2[casecount] = Dice3d_fn(generatedtarget2_keeplargest, target2)
+            generatedmask1.append(generatedtarget1_keeplargest)
+            generatedmask2.append(generatedtarget2_keeplargest)
+            if casecount + 1 < len(train_cases):
+                startimgslices[casecount + 1] = len(caseimg)
+
+        traincasedice1 = traincasedices1.sum() / float(len(train_cases))
+        traincasedice2 = traincasedices2.sum() / float(len(train_cases))
+
+        traincasediceavgtemp = (traincasedice1 + traincasedice2) / 2.0
+
+        if traincasediceavgtemp > besttraincasedice:
+            backfolder = os.path.join(train_root, tempmaskfolder + '_besttraindice')
+            if os.path.exists(backfolder):
+                shutil.rmtree(backfolder)
+            shutil.copytree(os.path.join(train_root, tempmaskfolder), backfolder)
+
+            besttraincasedice = traincasediceavgtemp
+            logging.info('Best Checkpoint {} Saving...'.format(epoch + 1))
+
+            save_model = net1
+            if torch.cuda.device_count() > 1:
+                save_model = list(net1.children())[0]
+            state = {
+                'net': save_model.state_dict(),
+                'loss': test_loss1_epoch,
+                'epoch': epoch + 1,
+            }
+            savecheckname = os.path.join('C:/Data/Models', params1_name.split('.pkl')[0] +
+                                         '_besttraincasedice.' + params1_name.split('.')[-1])
+            print(savecheckname)
+            torch.save(state, savecheckname)
+
+            save_model = net2
+            if torch.cuda.device_count() > 1:
+                save_model = list(net2.children())[0]
+            state = {
+                'net': save_model.state_dict(),
+                'loss': test_loss2_epoch,
+                'epoch': epoch + 1,
+            }
+            savecheckname = os.path.join('C:/Data/Models', params2_name.split('.pkl')[0] +
+                                         '_besttraincasedice.' + params2_name.split('.')[-1])
+            print(savecheckname)
+            torch.save(state, savecheckname)
+
         # if (epoch + 1) <= args.warmup_epoch or (epoch + 1) % 10 == 0:
         #     selected_samples = int(0.25 * (len(train_cases) - len(label_cases)))
         #     save_root = os.path.join(train_root, tempmaskfolder)
@@ -590,21 +596,21 @@ def Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labelcas
         #             smasksave = sitk.GetImageFromArray(np.transpose(generatedmask2[selectedidx], [2, 0, 1]))
         #             sitk.WriteImage(smasksave, save_name)
         #     logging.info('Mask {} modify for net2'.format([train_cases[i].split('/')[-1] for i in selectedidxs]))
-        #
-        # time_cost = time.time() - ts
-        # logging.info(
-        #     'epoch[%d/%d]: train_loss1: %.3f | test_loss1: %.3f | train_dice1: %.3f | test_dice1: %.3f || '
-        #     'traincase_dice1: %.3f || testcase_dice1: %.3f || time: %.1f'
-        #     % (epoch + 1, end_epoch, train_loss1_epoch, test_loss1_epoch, train_dice1_epoch, test_dice1_epoch,
-        #        traincasedice1, testcasedice1, time_cost))
-        # logging.info(
-        #     'epoch[%d/%d]: train_loss2: %.3f | test_loss2: %.3f | train_dice2: %.3f | test_dice2: %.3f || '
-        #     'traincase_dice2: %.3f || testcase_dice2: %.3f || time: %.1f'
-        #     % (epoch + 1, end_epoch, train_loss2_epoch, test_loss2_epoch, train_dice2_epoch, test_dice2_epoch,
-        #        traincasedice2, testcasedice2, time_cost))
-        # if args.lr_policy != 'None':
-        #     scheduler1.step()
-        #     scheduler2.step()
+
+        time_cost = time.time() - ts
+        logging.info(
+            'epoch[%d/%d]: train_loss1: %.3f | test_loss1: %.3f | train_dice1: %.3f | test_dice1: %.3f || '
+            'traincase_dice1: %.3f || testcase_dice1: %.3f || time: %.1f'
+            % (epoch + 1, end_epoch, train_loss1_epoch, test_loss1_epoch, train_dice1_epoch, test_dice1_epoch,
+               traincasedice1, testcasedice1, time_cost))
+        logging.info(
+            'epoch[%d/%d]: train_loss2: %.3f | test_loss2: %.3f | train_dice2: %.3f | test_dice2: %.3f || '
+            'traincase_dice2: %.3f || testcase_dice2: %.3f || time: %.1f'
+            % (epoch + 1, end_epoch, train_loss2_epoch, test_loss2_epoch, train_dice2_epoch, test_dice2_epoch,
+               traincasedice2, testcasedice2, time_cost))
+        if args.lr_policy != 'None':
+            scheduler1.step()
+            scheduler2.step()
 
 
 args = parse_args()
@@ -623,12 +629,12 @@ logging.basicConfig(level=logging.INFO,
 
 if __name__ == "__main__":
     args = parse_args()
-    train_root = 'D:\Deep_Learning\AIDE\data_files'
-    train_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\train_data2.csv'
-    test_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\test_data1.csv'
-    traincase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\train_cases2.csv'
-    testcase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\test_case1.csv'
-    labeledcase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\labelled_case1.csv'
+    train_root = '../input_forrest7T/images_and_masks'
+    train_csv = '../input_forrest7T/csvFiles/train_data2.csv'
+    test_csv = '../input_forrest7T/csvFiles/test_data1.csv'
+    traincase_csv = '../input_forrest7T/csvFiles/train_cases2.csv'
+    testcase_csv = '../input_forrest7T/csvFiles/test_case1.csv'
+    labeledcase_csv = '../input_forrest7T/csvFiles/labelled_case1.csv'
     tempmaskfolder = 'train_aug'
     makefolder(os.path.join(train_root, tempmaskfolder))
     tempmaskfolder = 'train_aug\{}_{}'.format(args.model_name, args.repetition)
