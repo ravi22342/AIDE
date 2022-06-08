@@ -136,7 +136,7 @@ class UNet(nn.Module):
     def __init__(self, num_classes=2, learned_bilinear=False):
         super(UNet, self).__init__()
 
-        self.down_block1 = UNet_basic_down_block(3, 64, False)
+        self.down_block1 = UNet_basic_down_block(1, 64, False)
         self.down_block2 = UNet_basic_down_block(64, 128, True)
         self.down_block3 = UNet_basic_down_block(128, 256, True)
         self.down_block4 = UNet_basic_down_block(256, 512, True)

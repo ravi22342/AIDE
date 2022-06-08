@@ -22,12 +22,10 @@ class prostate_seg(Dataset):
     def __getitem__(self, idx):
 
         imgarr = sitk.GetArrayFromImage(sitk.ReadImage(os.path.join(self.root, self.imgs[idx])))
-        #imgarr = imgarr[self.depths[idx], :, :]
         imgarr = imgarr / imgarr.max() * 255.0
         img = Image.fromarray(imgarr)
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-
+        # if img.mode != 'RGB':
+        #     img = img.convert('RGB')
         maskpath = os.path.join(self.root, self.masks[idx])
         if self.train:
             maskpath1 = os.path.join(self.root, self.tempmaskfolder,
@@ -41,7 +39,6 @@ class prostate_seg(Dataset):
             maskpath2 = maskpath
 
         maskarr = sitk.GetArrayFromImage(sitk.ReadImage(maskpath))
-        #maskarr = maskarr[self.depths[idx], :, :]
         maskarr[maskarr > 0] = 1
         mask = Image.fromarray(maskarr.astype(np.int8))
 

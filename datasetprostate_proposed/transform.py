@@ -95,7 +95,9 @@ class ToTensor(object):
         pass
 
     def __call__(self, img, augset, mask, mask1, mask2):
-        img = torch.from_numpy(np.array(img).transpose(2,0,1)).float() / 255.0
+
+        img = torch.from_numpy(np.array(img)).float() / 255.0
+
         mask = np.array(mask)
         mask = torch.from_numpy(mask).long()
         mask1 = np.array(mask1)
@@ -103,13 +105,13 @@ class ToTensor(object):
         mask2 = np.array(mask2)
         mask2 = torch.from_numpy(mask2).long()
 
-        augset['img1'] = torch.from_numpy(np.array(augset['img1']).transpose(2,0,1)).float() / 255.0
+        augset['img1'] = torch.from_numpy(np.array(augset['img1'])).float() / 255.0
 
-        augset['img2'] = torch.from_numpy(np.array(augset['img2']).transpose(2, 0, 1)).float() / 255.0
+        augset['img2'] = torch.from_numpy(np.array(augset['img2'])).float() / 255.0
 
-        augset['img3'] = torch.from_numpy(np.array(augset['img3']).transpose(2, 0, 1)).float() / 255.0
+        augset['img3'] = torch.from_numpy(np.array(augset['img3'])).float() / 255.0
 
-        augset['img4'] = torch.from_numpy(np.array(augset['img4']).transpose(2, 0, 1)).float() / 255.0
+        augset['img4'] = torch.from_numpy(np.array(augset['img4'])).float() / 255.0
 
         return img, augset, mask, mask1, mask2
 
@@ -122,11 +124,11 @@ class Normalize(object):
     def __call__(self, img, augset, mask, mask1, mask2):
 
         if self.mean is None:
-            imgmean = img.mean(dim=(1, 2)).unsqueeze(1).unsqueeze(2)
-            imgstd = img.std(dim=(1, 2)).unsqueeze(1).unsqueeze(2)
+            imgmean = img.mean(dim=(0, 1)).unsqueeze(0).unsqueeze(1)
+            imgstd = img.std(dim=(0, 1)).unsqueeze(0).unsqueeze(1)
         else:
-            imgmean = torch.FloatTensor(self.mean).unsqueeze(1).unsqueeze(2)
-            imgstd = torch.FloatTensor(self.std).unsqueeze(1).unsqueeze(2)
+            imgmean = torch.FloatTensor(self.mean).unsqueeze(0).unsqueeze(1)
+            imgstd = torch.FloatTensor(self.std).unsqueeze(0).unsqueeze(1)
 
         img = img.sub(imgmean).div(imgstd)
 
