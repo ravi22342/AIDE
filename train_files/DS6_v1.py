@@ -400,21 +400,3 @@ if __name__ == "__main__":
         os.mkdir(args.tensorboard_path)
     writer_training = SummaryWriter(args.tensorboard_path)
     Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labeledcase_csv, tempmaskfolder)
-
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    train_root = 'D:\Deep_Learning\AIDE\data_files'
-    train_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\train_data2.csv'
-    test_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\test_data1.csv'
-    traincase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\train_cases2.csv'
-    testcase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\test_case1.csv'
-    labeledcase_csv = 'D:\\Deep_Learning\\AIDE\\data_files\\csvFiles\\labelled_case1.csv'
-    tempmaskfolder = 'train_aug'
-    makefolder(os.path.join(train_root, tempmaskfolder))
-    tempmaskfolder = 'train_aug\{}_{}'.format(args.model_name, args.repetition)
-    # if not os.path.exists(args.tensorboard_path):
-    #   os.mkdir(args.tensorboard_path)
-    # writer_training = SummaryWriter(args.tensorboard_path)
-    Train(train_root, train_csv, test_csv, traincase_csv, testcase_csv, labeledcase_csv, tempmaskfolder)
